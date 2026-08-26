@@ -22,8 +22,8 @@ This was done with the following goals in mind:
 - Octets in a Space Packet are transmitted MSB first. The MSB is the 0th bit in each octet.
 - The Packet Primary Header consists of the following fields:  
   ![](images/packet_primary_header.png)
-  _ 3-bit packet version number is recommended to be '000'
-  _ Packet Identification Field is a 13-bit field comprised of a 1-bit Packet Type, 1 bit Secondary Header Flag, and 11-bit APID
+  - 3-bit packet version number is recommended to be '000'
+  - Packet Identification Field is a 13-bit field comprised of a 1-bit Packet Type, 1 bit Secondary Header Flag, and 11-bit APID
 - The structure of the Packet Data Field is mandated only to have at least one of the following:
   - User-defined packet secondary header (variable length)
   - User data field
@@ -58,19 +58,26 @@ This was done with the following goals in mind:
             "expected": "0b000"
         },
         "packet_type": {
-            "bits": 1
+            "bits": 1,
+            "expected": 0,
+            "notes": "Value of 0 for telemetry and 1 for commanding"
         },
         "sec_header_flag": {
-            "bits": 1
+            "bits": 1,
+            "expected": 1,
+            "notes": "Indicates that a secondary header is present"
         },
         "apid": {
             "bits": 11
         },
         "sequence_flags": {
-            "bits": 2
+            "bits": 2,
+            "expected": "0b11",
+            "notes": "Shall be 0b11 to indicate the space packet contains unsegmented user data"
         },
         "sequence_count": {
-            "bits": 14
+            "bits": 14,
+            "notes": "Increments from 0 to 16383"
         },
         "data_length": {
             "bits": 32,
@@ -92,6 +99,14 @@ This was done with the following goals in mind:
             "frame_sync": {
                 "bits": 32,
                 "expected": "0xABCD1234"
+            },
+            "data_length": {
+                "bits": 16,
+                "notes": "Length of ancillary data, in bytes. Min length 1, max length 65523"
+            },
+            "crc": {
+                "bits": 16,
+                "notes": "2-byte CRC computed across entire space packet, minus the CRC itself"
             }
         }
     }
