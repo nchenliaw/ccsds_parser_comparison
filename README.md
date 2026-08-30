@@ -46,8 +46,8 @@ This was done with the following goals in mind:
   - For increased realism, the Ancillary Data Field itself contains the following structure:
   - 4-byte frame sync header, fixed at 0xABCD1234
   - 2-byte data length field
-  - 2-byte CRC across the entire Space Packet, not including the CRC itself
-  - Data field (variable length), max 65523 Bytes, to conform to the Space Packet's 2^16 Byte max Data Field (65536 - (5-byte time code, 4-byte frame sync header, 2-byte data length field, and 2-byte CRC))
+  - 4-byte CRC across the entire Space Packet, not including the CRC itself
+  - Data field (variable length), max 65521 Bytes, to conform to the Space Packet's 2^16 Byte max Data Field (65536 - (5-byte time code, 4-byte frame sync header, 2-byte data length field, and 4-byte CRC))
 - All packet fields are transmitted Big Endian, MSB first.
 
 ```json
@@ -104,9 +104,12 @@ This was done with the following goals in mind:
                 "bits": 16,
                 "notes": "Length of ancillary data, in bytes. Min length 1, max length 65523"
             },
+            "data": {
+                "bits": "varied"
+            }
             "crc": {
-                "bits": 16,
-                "notes": "2-byte CRC computed across entire space packet, minus the CRC itself"
+                "bits": 32,
+                "notes": "4-byte CRC computed across entire space packet, minus the CRC itself"
             }
         }
     }
@@ -122,3 +125,7 @@ This was done with the following goals in mind:
   - Idle Packets
 
 # Results
+
+
+# Running Tests
+Python: `coverage run -m unittest discover -s tests/python && coverage report --show-missing`

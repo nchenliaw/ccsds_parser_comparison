@@ -1,0 +1,6 @@
+[run]
+source = src/python
+branch = true
+
+[report]
+show_missing = true
