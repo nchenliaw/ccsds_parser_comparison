@@ -1,21 +1,21 @@
+import binascii
 import struct
 import sys
 import unittest
-import binascii
-from unittest.mock import patch, MagicMock
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from src.python.packet_parser import (
+    CRC_SIZE_BYTES,
     FRAME_SYNC_HEADER,
-    VERSION_NUMBER,
     PACKET_TYPE,
     SECONDARY_HEADER_FLAG,
     SEQUENCE_FLAGS,
-    CRC_SIZE_BYTES,
+    VERSION_NUMBER,
     add_ancillary_header_to,
     create_space_packet_header,
     frame_packet,
@@ -103,18 +103,24 @@ class TestCreateSpacePacket(unittest.TestCase):
         with (
             patch("src.python.packet_parser.add_ancillary_header_to") as ancillary_hdr_patch,
             patch("src.python.packet_parser.create_space_packet_header") as sp_hdr_patch,
-            patch("src.python.packet_parser.binascii.crc32") as crc32_patch,
+            patch("src.python.packet_parser.binascii.crc_hqx") as crc16_patch,
         ):
             ancillary_hdr_patch.return_value = mock_packet_data
             sp_hdr_patch.return_value = mock_sp_header
-            crc32_patch.return_value = mock_crc_value
+            crc16_patch.return_value = mock_crc_value
 
             pkt = frame_packet(mock_packet_data, apid)
 
             ancillary_hdr_patch.assert_called_with(mock_packet_data)
             sp_hdr_patch.assert_called_with(data_len + CRC_SIZE_BYTES, apid)
-            crc32_patch.assert_called_with(mock_sp_data)
+            crc16_patch.assert_called_with(mock_sp_data, 0)
             self.assertEqual(pkt, mock_sp_data + struct.pack(">I", mock_crc_value))
+
+
+class TestParsePackets(unittest.TestCase):
+    def test_parse_primary_header(self):
+        # TODO
+        pass
 
 
 if __name__ == "__main__":

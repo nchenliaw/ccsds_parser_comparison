@@ -5,7 +5,7 @@ from datetime import datetime, UTC
 from dataclasses import dataclass
 
 BITS_PER_BYTE = 8
-CRC_SIZE_BYTES = 4
+CRC_SIZE_BYTES = 2
 FRAME_SYNC_HEADER = 0xABCD1234
 SEQUENCE_FLAGS = 0b11
 VERSION_NUMBER = 0
@@ -100,7 +100,8 @@ def parse_secondary_header(data: bytes):
 
 
 def parse_packets(data: bytes) -> tuple[list[dict], DebugMetaData]:
-    """_summary_
+    """Parses a byte stream of data and returns a tuple of [list[dict], DebugMetaData],
+    representing packets parsed and some metadata associated with the parsing 
 
     Args:
         data (bytes): byte stream of data
@@ -110,6 +111,7 @@ def parse_packets(data: bytes) -> tuple[list[dict], DebugMetaData]:
     """
     metadata = DebugMetaData()
     packets = []
+    parse_primary_header(data)
 
     return packets, metadata
 
@@ -185,7 +187,7 @@ def frame_packet(data: bytes, apid: int) -> bytes:
     data_len = len(data) + CRC_SIZE_BYTES  # add_ancillary_header_to does not include CRC
     header = create_space_packet_header(data_len, apid)
     data = header + data
-    crc = binascii.crc32(data)
+    crc = binascii.crc_hqx(data, 0) # 16-bit CRC
     data += struct.pack(">I", crc)
     return data
 
@@ -193,4 +195,4 @@ def frame_packet(data: bytes, apid: int) -> bytes:
 if __name__ == "__main__":
     data = b"\xb1\xb2\xb3\xb4\xb5\xb6"
     ret = frame_packet(data, apid=1234)
-    parse_packets(data)
+    parse_packets(ret)

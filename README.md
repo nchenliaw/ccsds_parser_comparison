@@ -134,10 +134,10 @@ Tests to include:
             },
             "data": {
                 "bits": "varied"
-            }
+            },
             "crc": {
                 "bits": 16,
-                "notes": "4-byte CRC computed across entire space packet, minus the CRC itself"
+                "notes": "2-byte CRC computed across entire space packet, minus the CRC itself"
             }
         }
     }
