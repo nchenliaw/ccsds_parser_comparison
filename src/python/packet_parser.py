@@ -54,7 +54,7 @@ def extract_bits(value: int, bit_width: int, start_bit: int, end_bit: int) -> in
     """
     width = end_bit - start_bit + 1
     mask = n_bits_mask(width)
-    shifted = value >> (bit_width - end_bit)
+    shifted = value >> (bit_width - end_bit - 1)
     return shifted & mask
 
 
@@ -87,7 +87,7 @@ def parse_primary_header(data: bytes) -> dict[str, int]:
     second_word = struct.unpack(fmt, data[2:4])[0]
 
     ret["sequence_flags"] = extract_bits(second_word, size, 0, 1)
-    ret["packet_sequence"] = extract_bits(second_word, size, 2, 15)
+    ret["sequence_count"] = extract_bits(second_word, size, 2, 15)
 
     ret["data_length"] = struct.unpack(fmt, data[4:6])[0]
 
@@ -101,7 +101,7 @@ def parse_secondary_header(data: bytes):
 
 def parse_packets(data: bytes) -> tuple[list[dict], DebugMetaData]:
     """Parses a byte stream of data and returns a tuple of [list[dict], DebugMetaData],
-    representing packets parsed and some metadata associated with the parsing 
+    representing packets parsed and some metadata associated with the parsing
 
     Args:
         data (bytes): byte stream of data
@@ -187,7 +187,7 @@ def frame_packet(data: bytes, apid: int) -> bytes:
     data_len = len(data) + CRC_SIZE_BYTES  # add_ancillary_header_to does not include CRC
     header = create_space_packet_header(data_len, apid)
     data = header + data
-    crc = binascii.crc_hqx(data, 0) # 16-bit CRC
+    crc = binascii.crc_hqx(data, 0)  # 16-bit CRC
     data += struct.pack(">I", crc)
     return data
 

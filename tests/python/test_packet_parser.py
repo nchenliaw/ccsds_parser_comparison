@@ -19,6 +19,8 @@ from src.python.packet_parser import (
     add_ancillary_header_to,
     create_space_packet_header,
     frame_packet,
+    parse_primary_header,
+    extract_bits
 )
 
 
@@ -80,7 +82,7 @@ class TestCreateSpacePacketHeader(unittest.TestCase):
         self.assertEqual(
             parsed_sequence_flags,
             SEQUENCE_FLAGS,
-            f"Parsed sequence_flags incorrect for {apid=} {data_len=}. Expected={bin(SEQUENCE_FLAGS)}, Actual={bin(parsed_sequence_flagsS)}",
+            f"Parsed sequence_flags incorrect for {apid=} {data_len=}. Expected={bin(SEQUENCE_FLAGS)}, Actual={bin(parsed_sequence_flags)}",
         )
 
     def test_create_space_packet_header(self):
@@ -118,9 +120,29 @@ class TestCreateSpacePacket(unittest.TestCase):
 
 
 class TestParsePackets(unittest.TestCase):
+
+    def test_extract_bits(self):
+        value = 0b01100100
+        self.assertEqual(extract_bits(value, bit_width=8, start_bit=0, end_bit=0), 0)
+        self.assertEqual(extract_bits(value, bit_width=8, start_bit=1, end_bit=1), 1)
+        self.assertEqual(extract_bits(value, bit_width=8, start_bit=2, end_bit=2), 1)
+        self.assertEqual(extract_bits(value, bit_width=8, start_bit=3, end_bit=3), 0)
+        self.assertEqual(extract_bits(value, bit_width=8, start_bit=4, end_bit=4), 0)
+        self.assertEqual(extract_bits(value, bit_width=8, start_bit=5, end_bit=5), 1)
+        self.assertEqual(extract_bits(value, bit_width=8, start_bit=6, end_bit=6), 0)
+        self.assertEqual(extract_bits(value, bit_width=8, start_bit=7, end_bit=7), 0)
+
     def test_parse_primary_header(self):
-        # TODO
-        pass
+        data = bytes.fromhex("0801c001a79a")
+        ret = parse_primary_header(data)
+        print(ret)
+        self.assertEqual(ret["version_number"], 0)
+        self.assertEqual(ret["packet_type"], 0)
+        self.assertEqual(ret["sec_hdr_flag"], 1)
+        self.assertEqual(ret["apid"], 1)
+        self.assertEqual(ret["sequence_flags"], 3)
+        self.assertEqual(ret["sequence_count"], 1)
+        self.assertEqual(ret["data_length"], 42906)
 
 
 if __name__ == "__main__":
