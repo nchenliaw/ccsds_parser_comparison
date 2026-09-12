@@ -1,8 +1,9 @@
-import struct
-import math
 import binascii
-from datetime import datetime, UTC
+import struct
+import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
 BITS_PER_BYTE = 8
 CRC_SIZE_BYTES = 2
@@ -17,10 +18,10 @@ sequence_count = 0
 
 @dataclass
 class DebugMetaData:
-    packets_parsed: int
-    dropped_packets: int
-    malformed_packets: int
-    bad_crcs: int
+    packets_parsed: int = 0
+    dropped_packets: int = 0
+    malformed_packets: int = 0
+    bad_crcs: int = 0
 
 
 def n_bits_mask(n: int) -> int:
@@ -58,7 +59,7 @@ def extract_bits(value: int, bit_width: int, start_bit: int, end_bit: int) -> in
     return shifted & mask
 
 
-def parse_primary_header(data: bytes) -> dict[str, int]:
+def parse_primary_header(data: bytes, start_byte: int) -> tuple[dict[str, int], int]:
     """Parses primary header (first 6 bytes) from data.
 
     Args:
@@ -73,30 +74,73 @@ def parse_primary_header(data: bytes) -> dict[str, int]:
           sequence flags,
           packet sequence number,
           packet data length
+        int: new start byte
     """
     ret = {}
-    fmt = ">H"
+    fmt = ">H"  # 2 bytes
     size = struct.calcsize(fmt) * BITS_PER_BYTE
-    first_word = struct.unpack(fmt, data[0:2])[0]
+    first_word = struct.unpack_from(fmt, data, start_byte)[0]
 
     ret["version_number"] = extract_bits(first_word, size, 0, 2)
     ret["packet_type"] = extract_bits(first_word, size, 3, 3)
     ret["sec_hdr_flag"] = extract_bits(first_word, size, 4, 4)
     ret["apid"] = extract_bits(first_word, size, 5, 15)
 
-    second_word = struct.unpack(fmt, data[2:4])[0]
+    second_word = struct.unpack_from(fmt, data, start_byte + 2)[0]
 
     ret["sequence_flags"] = extract_bits(second_word, size, 0, 1)
     ret["sequence_count"] = extract_bits(second_word, size, 2, 15)
 
-    ret["data_length"] = struct.unpack(fmt, data[4:6])[0]
+    ret["data_length"] = struct.unpack_from(fmt, data, start_byte + 4)[0]
 
-    return ret
+    return ret, start_byte + 6
 
 
-def parse_secondary_header(data: bytes):
-    time_code = parse_time_code_field(data)
-    ancillary_data = parse_ancillary_data_field(data)
+def parse_time_code_field(data: bytes, start_byte: int) -> tuple[float, int]:
+    """Parse 5-byte time code field, defined as 4-byte
+    coarse time and 1-byte fine time. Coarse time is POSIX seconds,
+    fine time is subseconds in 1/256 intervals
+
+    Args:
+        data (bytes): Data from which to parse time code
+        start_byte (int): Starting byte index to parse
+
+    Returns:
+        tuple[float, int]: Posix seconds (float), position of next byte to parse
+    """
+    sec = struct.unpack_from(">I", data, offset=start_byte)[0]
+    subseconds = struct.unpack_from(">B", data, offset=start_byte + 4)[0] / 256
+    return sec + subseconds, start_byte + 5
+
+
+def parse_ancillary_data_field(data: bytes, start_byte: int) -> tuple[dict[str, Any], int]:
+    """Parse packet ancillary data field starting from start_byte. Returns
+    dict of parsed data and updated start byte resulting from parsing
+
+    Args:
+        data (bytes): Data from which to parse
+        start_byte (int): Starting byte index to parse
+
+    Returns:
+        tuple[dict[str, Any], int]: dict contains parsed packet data, int is position of next byte to parse
+    """
+    ret = {}
+    ret["frame_sync"] = struct.unpack_from(">L", data, start_byte)[0]
+    ret["ancillary_data_length"] = struct.unpack_from(">H", data, start_byte + 4)[0]
+    data_length = ret["ancillary_data_length"]
+    data_start = start_byte + 6
+    data_end = data_start + data_length
+    ret["data"] = data[data_start:data_end]
+    ret["crc"] = struct.unpack_from(">H", data, data_end)[0]
+
+    return ret, data_end + 2
+
+
+def parse_secondary_header(data: bytes, start_byte) -> tuple[dict[str, Any], int]:
+    time, start_byte = parse_time_code_field(data, start_byte)
+    ancillary_data, start_byte = parse_ancillary_data_field(data, start_byte)
+    ret = {"time": time}
+    return ret | ancillary_data, start_byte
 
 
 def parse_packets(data: bytes) -> tuple[list[dict], DebugMetaData]:
@@ -111,8 +155,18 @@ def parse_packets(data: bytes) -> tuple[list[dict], DebugMetaData]:
     """
     metadata = DebugMetaData()
     packets = []
-    parse_primary_header(data)
+    start_byte = 0
+    data_len = len(data)
+    while start_byte < data_len:
+        hdr, start_byte = parse_primary_header(data, start_byte)
+        # TODO: check frame sync
+        sec, start_byte = parse_secondary_header(data, start_byte)
 
+        packets.append(hdr | sec)
+        # TODO: Implement more metadata metrics
+        metadata.packets_parsed += 1
+
+    # TODO: Implement a loop to parse all packets from data
     return packets, metadata
 
 
@@ -131,12 +185,13 @@ def add_ancillary_header_to(data: bytes, timestamp: datetime | None = None) -> b
             datetime.now(UTC) will be used
 
     Returns:
-        bytes: Packet framed with ancillary header
+        bytes: Packet framed with ancillary header, not including CRC
     """
+    # TODO: Use struct.pack_into and preallocate buffer
     if timestamp is None:
         timestamp = datetime.now(UTC)
     coarse_time = int(timestamp.timestamp())
-    fine_time = int(timestamp.microsecond / 1e6 * 256)
+    fine_time = round(timestamp.microsecond / 1e6 * 256) % 256
     data_len = len(data)
     # We're packing the headers closest to the data field first
     data = struct.pack(">H", data_len) + data
@@ -158,6 +213,7 @@ def create_space_packet_header(data_len: int, apid: int) -> bytes:
     Returns:
         bytes: Framed space packet
     """
+    # TODO: Use struct.pack_into to add into a buffer
     if apid > 2**11 - 1 or apid < 1:
         raise ValueError(f"APID {apid} is not valid. APID must be 11 bits max, or less than or equal to 2047")
     packet_version_and_id = (VERSION_NUMBER << 13) | (PACKET_TYPE << 12) | (SECONDARY_HEADER_FLAG << 11) | apid
@@ -183,16 +239,31 @@ def frame_packet(data: bytes, apid: int) -> bytes:
     global sequence_count
     sequence_count += 1
 
+    # TODO: use struct.pack_into
     data = add_ancillary_header_to(data)
     data_len = len(data) + CRC_SIZE_BYTES  # add_ancillary_header_to does not include CRC
     header = create_space_packet_header(data_len, apid)
     data = header + data
     crc = binascii.crc_hqx(data, 0)  # 16-bit CRC
-    data += struct.pack(">I", crc)
+    data += struct.pack(">H", crc)
     return data
 
 
 if __name__ == "__main__":
-    data = b"\xb1\xb2\xb3\xb4\xb5\xb6"
-    ret = frame_packet(data, apid=1234)
-    parse_packets(ret)
+    from pathlib import Path
+
+    CURRENT_FOLDER = Path(__file__).parent
+    REPO_TOPLEVEL = CURRENT_FOLDER.parents[1]
+    with open(Path(REPO_TOPLEVEL, "tests", "test_files", "10M_packets.bin"), "rb") as f:
+        data = f.read()
+
+    start = time.perf_counter()
+    parsed_packets, metadata = parse_packets(data)
+    end = time.perf_counter()
+
+    duration = end - start
+    data_size = len(data)
+    speed_bytes_per_sec = data_size / duration
+    speed_megabits_per_sec = speed_bytes_per_sec * 8 / 1e6
+
+    print(f"Parsed {len(parsed_packets)} packets in {duration}s, {speed_megabits_per_sec}mbps")

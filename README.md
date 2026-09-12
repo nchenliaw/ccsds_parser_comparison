@@ -69,7 +69,7 @@ Tests to include:
 - The secondary header is 133.0-B-2 compliant, containing a Time Code field and an Ancillary Data Field
   - Time code is defined by [CCSDS 301.0-B-4](https://ccsds.org/publications/bluebooks/entry/3147/)
     - No Preamble field
-    - 4-byte coarse time, measuring seconds since CCSDS Unsegmented Time Code (CUC) epoch of 1 January 1958
+    - 4-byte coarse time, measuring POSIX seconds
     - 1-byte fine time, measuring subsections as 1/256ths of a second
   - For increased realism, the Ancillary Data Field itself contains the following structure:
   - 4-byte frame sync header, fixed at 0xABCD1234
@@ -116,7 +116,7 @@ Tests to include:
         "time_code_field": {
             "coarse_time": {
                 "bits": 32,
-                "notes": "Seconds since CCSDS Unsegmented Time Code (CUC) epoch of 1958 January 1"
+                "notes": "POSIX seconds"
             },
             "fine_time": {
                 "bits": 8,
@@ -128,7 +128,7 @@ Tests to include:
                 "bits": 32,
                 "expected": "0xABCD1234"
             },
-            "data_length": {
+            "ancillary_data_length": {
                 "bits": 16,
                 "notes": "Length of ancillary data, in bytes. Min length 1, max length 65523"
             },
@@ -153,6 +153,8 @@ Tests to include:
   - Idle Packets
 
 # Results
+
+Python: Parsed 10 million packets in 20.540113147999364s, 89.58081130040993mbps
 
 # Running Tests
 

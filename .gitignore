@@ -1,3 +1,5 @@
 .venv
 __pycache__
 *.pyc
+tests/test_files/10M_packets.bin
+tests/test_files/1M_packets.bin

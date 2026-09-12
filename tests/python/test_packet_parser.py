@@ -9,19 +9,7 @@ from unittest.mock import MagicMock, patch
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.python.packet_parser import (
-    CRC_SIZE_BYTES,
-    FRAME_SYNC_HEADER,
-    PACKET_TYPE,
-    SECONDARY_HEADER_FLAG,
-    SEQUENCE_FLAGS,
-    VERSION_NUMBER,
-    add_ancillary_header_to,
-    create_space_packet_header,
-    frame_packet,
-    parse_primary_header,
-    extract_bits
-)
+from src.python.packet_parser import *
 
 
 class TestCreateAncillaryHeader(unittest.TestCase):
@@ -120,7 +108,6 @@ class TestCreateSpacePacket(unittest.TestCase):
 
 
 class TestParsePackets(unittest.TestCase):
-
     def test_extract_bits(self):
         value = 0b01100100
         self.assertEqual(extract_bits(value, bit_width=8, start_bit=0, end_bit=0), 0)
@@ -134,15 +121,58 @@ class TestParsePackets(unittest.TestCase):
 
     def test_parse_primary_header(self):
         data = bytes.fromhex("0801c001a79a")
-        ret = parse_primary_header(data)
-        print(ret)
-        self.assertEqual(ret["version_number"], 0)
-        self.assertEqual(ret["packet_type"], 0)
-        self.assertEqual(ret["sec_hdr_flag"], 1)
-        self.assertEqual(ret["apid"], 1)
-        self.assertEqual(ret["sequence_flags"], 3)
-        self.assertEqual(ret["sequence_count"], 1)
-        self.assertEqual(ret["data_length"], 42906)
+        ret, new_start_byte = parse_primary_header(data, 0)
+
+        expected_primary_header = {
+            "version_number": 0,
+            "packet_type": 0,
+            "sec_hdr_flag": 1,
+            "apid": 1,
+            "sequence_flags": 3,
+            "sequence_count": 1,
+            "data_length": 42906,
+        }
+
+        self.assertEqual(new_start_byte, 6)
+        self.assertDictEqual(ret, expected_primary_header)
+
+    def test_parse_time_code_field(self):
+        # 2026-01-01T12:00:00.761718
+        seconds = 1767225600
+        # 0.76171875 = 195/256
+        fine_time = 195
+        float_repr = seconds + (fine_time / 256)
+        # Time code field is 5 bytes, but we're adding 1-byte of fill at position 0
+        # This tests the start_byte argument in parse_time_code_field
+        buffer = bytearray(6)
+        struct.pack_into(">L", buffer, 1, seconds)
+        struct.pack_into(">B", buffer, 5, fine_time)
+
+        self.assertEqual(buffer.hex(), "006955b900c3")
+
+        time, idx = parse_time_code_field(buffer, 1)
+
+        self.assertEqual(time, float_repr)
+        self.assertEqual(idx, 6)
+
+    def test_parse_ancillary_data_field(self):
+        frame_sync = bytes.fromhex("abcd1234")
+        data_length = struct.pack(">H", 4)  # 2-byte data length
+        data = bytes.fromhex("1122F2B2")
+        # Represents 16-bit CRC. CRC should be computed over the whole packet, so a placeholder value is acceptable
+        crc = bytes.fromhex("B2C3")
+
+        expected = {"frame_sync": 0xABCD1234, "ancillary_data_length": 4, "data": data, "crc": 0xB2C3}
+
+        # Parse starting at start_index. Zero-fill with start_index bytes before the actual packet data
+        start_index = 3
+        data_to_parse = bytes(start_index) + frame_sync + data_length + data + crc
+        expected_new_start_index = len(data_to_parse)
+
+        pkt, new_start_byte = parse_ancillary_data_field(data_to_parse, start_index)
+
+        self.assertEqual(new_start_byte, expected_new_start_index)
+        self.assertDictEqual(pkt, expected)
 
 
 if __name__ == "__main__":
