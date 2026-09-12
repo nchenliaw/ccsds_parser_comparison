@@ -1,15 +1,18 @@
-import binascii
 import struct
 import sys
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT))
+SRC_PYTHON = REPO_ROOT / "src" / "python"
+sys.path.insert(0, str(SRC_PYTHON))
 
 from src.python.packet_parser import *
+
+CURRENT_FOLDER = Path(__file__).parent
+TEST_FILES_FOLDER = CURRENT_FOLDER.parent / "test_files"
 
 
 class TestCreateAncillaryHeader(unittest.TestCase):
@@ -100,11 +103,10 @@ class TestCreateSpacePacket(unittest.TestCase):
             crc16_patch.return_value = mock_crc_value
 
             pkt = frame_packet(mock_packet_data, apid)
-
             ancillary_hdr_patch.assert_called_with(mock_packet_data)
             sp_hdr_patch.assert_called_with(data_len + CRC_SIZE_BYTES, apid)
             crc16_patch.assert_called_with(mock_sp_data, 0)
-            self.assertEqual(pkt, mock_sp_data + struct.pack(">I", mock_crc_value))
+            self.assertEqual(pkt, mock_sp_data + struct.pack(">H", mock_crc_value))
 
 
 class TestParsePackets(unittest.TestCase):
@@ -173,6 +175,64 @@ class TestParsePackets(unittest.TestCase):
 
         self.assertEqual(new_start_byte, expected_new_start_index)
         self.assertDictEqual(pkt, expected)
+
+    def test_parse_packets_end_to_end(self):
+        test_file = TEST_FILES_FOLDER / "3_packets.bin"
+        with open(test_file, "rb") as f:
+            data = f.read()
+        packets, metadata = parse_packets(data)
+
+        expected_packets = [
+            {
+                "version_number": 0,
+                "packet_type": 0,
+                "sec_hdr_flag": 1,
+                "apid": 816,
+                "sequence_flags": 3,
+                "sequence_count": 1,
+                "data_length": 17,
+                "time": 1789234936.3515625,
+                "frame_sync": 0xABCD1234,
+                "ancillary_data_length": 4,
+                "data": b"\x00\x00\x00\x00",
+                "crc": 0x89A9,
+            },
+            {
+                "version_number": 0,
+                "packet_type": 0,
+                "sec_hdr_flag": 1,
+                "apid": 1088,
+                "sequence_flags": 3,
+                "sequence_count": 2,
+                "data_length": 17,
+                "time": 1789234936.3515625,
+                "frame_sync": 0xABCD1234,
+                "ancillary_data_length": 4,
+                "data": b"\x00\x00\x00\x00",
+                "crc": 0x80C3,
+            },
+            {
+                "version_number": 0,
+                "packet_type": 0,
+                "sec_hdr_flag": 1,
+                "apid": 1475,
+                "sequence_flags": 3,
+                "sequence_count": 3,
+                "data_length": 17,
+                "time": 1789234936.3515625,
+                "frame_sync": 0xABCD1234,
+                "ancillary_data_length": 4,
+                "data": b"\x00\x00\x00\x00",
+                "crc": 0x912A,
+            },
+        ]
+
+        self.assertEqual(metadata.packets_parsed, 3)
+        self.assertEqual(metadata.bad_crcs, 0)
+        self.assertEqual(metadata.dropped_packets, 0)
+        self.assertEqual(metadata.malformed_packets, 0)
+        for packet, expected in zip(packets, expected_packets):
+            self.assertDictEqual(packet, expected)
 
 
 if __name__ == "__main__":

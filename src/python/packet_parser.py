@@ -170,10 +170,6 @@ def parse_packets(data: bytes) -> tuple[list[dict], DebugMetaData]:
     return packets, metadata
 
 
-def create_packet(data, secondary_hdr_config) -> bytes:
-    pass
-
-
 def add_ancillary_header_to(data: bytes, timestamp: datetime | None = None) -> bytes:
     """Recieves data to wrap in ancillary data field headers but
     without CRC. CRC will be added later, once the primary header
@@ -247,23 +243,3 @@ def frame_packet(data: bytes, apid: int) -> bytes:
     crc = binascii.crc_hqx(data, 0)  # 16-bit CRC
     data += struct.pack(">H", crc)
     return data
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    CURRENT_FOLDER = Path(__file__).parent
-    REPO_TOPLEVEL = CURRENT_FOLDER.parents[1]
-    with open(Path(REPO_TOPLEVEL, "tests", "test_files", "10M_packets.bin"), "rb") as f:
-        data = f.read()
-
-    start = time.perf_counter()
-    parsed_packets, metadata = parse_packets(data)
-    end = time.perf_counter()
-
-    duration = end - start
-    data_size = len(data)
-    speed_bytes_per_sec = data_size / duration
-    speed_megabits_per_sec = speed_bytes_per_sec * 8 / 1e6
-
-    print(f"Parsed {len(parsed_packets)} packets in {duration}s, {speed_megabits_per_sec}mbps")

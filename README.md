@@ -17,6 +17,7 @@ This was done with the following goals in mind:
 # Research
 
 ## Space Packet
+
 - A CCSDS Space Packet must contain a Primary Header of 6 octets and a Packet Data Field of 1 to 2^16 octets.  
   ![](images/packet_structure.png)
 - An octet is defined as a sequence of 8 bits
@@ -34,20 +35,23 @@ This was done with the following goals in mind:
   - A Time Code Field followed by an Ancillary Data Field
 
 ## Frame Syncs and ASM
+
 This project defines a frame sync header for the Space Packet's ancillary data field. The primary synchronization method in a real system happens upstream at transfer frames, and is out of scope for this packet parser. However, the ancillary data field's frame sync header is still used for **re-synchronization** if invalid packets (bad length, bad CRC, etc.) are parsed.
 
-The ancillary data field's frame sync header is used as a more reliable method for resynchronization compared to the other option, which is parsing the Space Packet primary header. Not all 6 bytes of the primary header are the same each time - APID and sequence count may change with each packet. This leaves only 5 bits static for the Primary header - Version Number, Packet Type,and Secondary header flag. In this example, those 5 bits will be `0b00001`, which is an unreliable sequence of bits to use for frame sync.  
+The ancillary data field's frame sync header is used as a more reliable method for resynchronization compared to the other option, which is parsing the Space Packet primary header. Not all 6 bytes of the primary header are the same each time - APID and sequence count may change with each packet. This leaves only 5 bits static for the Primary header - Version Number, Packet Type,and Secondary header flag. In this example, those 5 bits will be `0b00001`, which is an unreliable sequence of bits to use for frame sync.
 
-[CCSDS 131.0-B-6](https://ccsds.org/publications/bluebooks/entry/4803/) defines TM synhronization and channel coding. An example RF chain is shown below. This repo's space packet parsers only implement the last stage of the chain, highlighted with **. 
+[CCSDS 131.0-B-6](https://ccsds.org/publications/bluebooks/entry/4803/) defines TM synhronization and channel coding. An example RF chain is shown below. This repo's space packet parsers only implement the last stage of the chain, highlighted with \*\*.
+
 ```
 Modulated RF data stream (e.g. BPSK, QPSK) -> carrier demodulation -> inner FEC decoding -> Frame sync via ASM (Attached Sync Marker) detection
--> outer FEC decoding (e.g. Reed-Solomon decoding) -> VCID demux + packet reassembly (transfer frames are fixed-length and 
+-> outer FEC decoding (e.g. Reed-Solomon decoding) -> VCID demux + packet reassembly (transfer frames are fixed-length and
 space packets may cross transfer frame boundaries) -> **Space packet parsing**
 ```
 
 In a real system, even with all of these error correction and validity mechanisms, one may not assume that packets reaching the packet parser are all correct. For example, a dropped frame may contain packet data that crosses frame boundaries; the result is that a partial packet may be sent to the packet parser.
 
 As a consequence, these are some considerations for a packet parser:
+
 1. Length field must be validated, and ensure no out-of-bounds errors crash the program (e.g. specified length field exceeds data/array boundary)
 1. Validate static/expected field values immediately - version number, packet type, etc.
 1. CRC failures should result in discarded packets
@@ -55,6 +59,7 @@ As a consequence, these are some considerations for a packet parser:
 1. Have metadata to track/preserve rejected data
 
 Tests to include:
+
 1. Packet with invalid length field
 1. Packet with bad CRC
 1. Valid with good CRC but invalid primary packet header
@@ -154,7 +159,15 @@ Tests to include:
 
 # Results
 
-Python: Parsed 10 million packets in 20.540113147999364s, 89.58081130040993mbps
+## Python
+
+Run with:
+
+```bash
+python3 src/python/run_packet_parser_test.py tests/test_files/10M_packets.bin
+```
+
+Parsed 10 million packets in 20.540113147999364s, 89.58mbps
 
 # Running Tests
 
