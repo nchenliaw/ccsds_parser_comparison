@@ -158,13 +158,17 @@ def parse_packets(data: bytes) -> tuple[list[dict], DebugMetaData]:
     start_byte = 0
     data_len = len(data)
     while start_byte < data_len:
-        hdr, start_byte = parse_primary_header(data, start_byte)
+        hdr, post_primary_byte = parse_primary_header(data, start_byte)
         # TODO: check frame sync
-        sec, start_byte = parse_secondary_header(data, start_byte)
-
-        packets.append(hdr | sec)
-        # TODO: Implement more metadata metrics
-        metadata.packets_parsed += 1
+        sec, new_start_byte = parse_secondary_header(data, post_primary_byte)
+        actual_crc = binascii.crc_hqx(data[start_byte : new_start_byte - 2], 0)
+        if actual_crc != sec["crc"]:
+            metadata.bad_crcs += 1
+        else:
+            packets.append(hdr | sec)
+            # TODO: Implement more metadata metrics
+            metadata.packets_parsed += 1
+        start_byte = new_start_byte
 
     # TODO: Implement a loop to parse all packets from data
     return packets, metadata

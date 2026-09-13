@@ -80,7 +80,7 @@ Tests to include:
   - 4-byte frame sync header, fixed at 0xABCD1234
   - 2-byte data length field
   - 2-byte CRC across the entire Space Packet, not including the CRC itself. 16-bit CRC is computed via the CRC-CCITT polynomial, represented as `0x1021`
-  - Data field (variable length), max 65523 Bytes, to conform to the Space Packet's 2^16 Byte max Data Field (65536 - (5-byte time code, 4-byte frame sync header, 2-byte data length field, and 2-byte CRC))
+  - Data field (variable length), max 65522 Bytes, to conform to the Space Packet's 2^16 Byte max Data Field (65535 - (5-byte time code, 4-byte frame sync header, 2-byte data length field, and 2-byte CRC))
 - All packet fields are transmitted Big Endian, MSB first.
 
 ```json

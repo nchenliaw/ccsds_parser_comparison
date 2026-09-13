@@ -27,7 +27,7 @@ def main(args):
 
     with open(outfile, "wb") as f:
         for _ in range(args.n):
-            data_length = random.randint(1, 65535)
+            data_length = random.randint(1, 65522)
             apid = random.randint(1, 2**11 - 1)
             rand_pkt_data = random.randbytes(data_length)
             pkt = frame_packet(rand_pkt_data, apid)
@@ -37,4 +37,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:])) # pragma: no cover
+    sys.exit(main(sys.argv[1:]))  # pragma: no cover

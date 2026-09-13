@@ -234,6 +234,14 @@ class TestParsePackets(unittest.TestCase):
         for packet, expected in zip(packets, expected_packets):
             self.assertDictEqual(packet, expected)
 
+    def test_parse_bad_crc(self):
+        # First packet from 3_packets.bin, with an intentional bad CRC 'AA' in the last byte
+        test_data = bytes.fromhex("0b30c00100116aa58ef85aabcd123400040000000089AA")
+        packets, metadata = parse_packets(test_data)
+        self.assertListEqual(packets, [])
+        self.assertEqual(metadata.bad_crcs, 1)
+
+
 
 if __name__ == "__main__":
     unittest.main()
