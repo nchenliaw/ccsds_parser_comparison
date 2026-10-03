@@ -1,6 +1,7 @@
 #include <cstdint>
-#include <stdexcept>
 #include <vector>
+
+const unsigned WIDTH_16_BIT = 16;
 
 /**
  * @brief Running counters of packet-parsing outcomes for diagnostics and monitoring
@@ -32,12 +33,12 @@ struct PrimaryHeader
  */
 struct SecondaryHeader
 {
-    uint32_t coarse_time;            ///< UNIX seconds
-    uint8_t fine_time;               ///< Subseconds, in 1/256 second increments
-    uint32_t frame_sync;             ///< Expected frame sync value of 0xABCD1234
+    uint32_t coarse_time; ///< UNIX seconds
+    uint8_t fine_time;    ///< Subseconds, in 1/256 second increments
+    uint32_t frame_sync;  ///< Expected frame sync value of 0xABCD1234
     uint16_t ancillary_data_length;
     std::vector<uint8_t> data;
-    uint16_t crc;                    ///< 2-byte CRC computed across the entire packet: Both the primary + secondary header
+    uint16_t crc; ///< 2-byte CRC computed across the entire packet: Both the primary + secondary header
 };
 
 /**
@@ -63,3 +64,9 @@ struct ParsedPacket
  * @throws std::invalid_argument if n > 64
  */
 constexpr uint64_t n_bits_mask(unsigned int n);
+
+/**
+ * @brief Extract bits from uint16_t integer values. The start_bit is the MSB
+ * Ex: extract_bits(14, 4, 0, 2) = 7. 14=0b1110. Bits 0-2 are '111' -> 0b111=7
+ */
+uint16_t extract_bits(const uint16_t value, const unsigned bit_width, const unsigned start_bit, const unsigned end_bit);
